@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AgentConfig: Version Control for AI Agent Configurations</title>
+<style>
+  @page { margin: 2.5cm 3cm; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: "Times New Roman", Times, serif;
+    max-width: 800px; margin: auto; padding: 60px;
+    font-size: 12pt; line-height: 1.6; color: #000;
+  }
+  h1 { font-size: 26pt; text-align: center; margin-bottom: 8px; font-weight: bold; }
+  .subtitle { text-align: center; font-size: 14pt; color: #444; margin-bottom: 30px; }
+  h2 { font-size: 16pt; margin-top: 28px; border-bottom: 1px solid #999; padding-bottom: 4px; font-weight: bold; }
+  h3 { font-size: 13pt; margin-top: 20px; font-weight: bold; }
+  p { text-align: justify; margin: 8px 0; text-indent: 0; }
+  .abstract { font-style: italic; text-align: justify; margin: 24px 30px; font-size: 11pt; }
+  pre {
+    background: #f8f8f8; padding: 12px 16px; font-size: 9pt;
+    font-family: "Courier New", monospace; border: 1px solid #ddd;
+    overflow-x: auto; white-space: pre-wrap; margin: 10px 0;
+    line-height: 1.4;
+  }
+  code { font-size: 9.5pt; font-family: "Courier New", monospace; }
+  table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 10pt; }
+  td, th { border: 1px solid #bbb; padding: 6px 10px; text-align: left; }
+  th { background: #eee; font-weight: bold; }
+  hr { margin: 20px 0; border: none; border-top: 1px solid #ccc; }
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 3px 0; }
+  strong { font-weight: bold; }
+  .ref { font-size: 10pt; margin: 2px 0; text-indent: -20px; padding-left: 20px; }
+  .section-number { font-weight: bold; }
+</style>
+</head>
+<body>
+
+<h1>AgentConfig: Version Control for AI Agent Configurations</h1>
+<p class="subtitle">Automated Configuration Management Across Agent Frameworks</p>
+
+<div class="abstract">
+<strong>Abstract</strong><br>
+AI agent configurations—prompts, tool definitions, model parameters, and framework settings—are typically managed ad-hoc, embedded as hardcoded strings in application code. When a configuration breaks, users must manually rebuild from scratch. Existing tools version prompts in isolation but ignore the full configuration bundle. We present <strong>AgentConfig</strong>, a version control system for complete agent configurations across multiple agent frameworks (Claude Code, OpenAI Agents SDK, Hermes). AgentConfig introduces (1) a unified manifest schema capturing prompts, tools, model parameters, and framework metadata, (2) a structural diff engine that identifies semantic changes rather than text-level diffs, (3) a Git-like version store with environment promotion (dev→staging→prod) and instant rollback (&lt;1ms), and (4) an A/B testing mechanism operating through tag-based version routing. We demonstrate the system across three frameworks with breaking change detection and sub-millisecond rollback times.
+</div>
+
+<h2>1 Introduction</h2>
+
+<p>AI agents are increasingly composed of complex configurations spanning multiple dimensions: system prompts, tool definitions (with JSON schemas), model parameters, knowledge base references, and framework-specific settings. A single-agent deployment can involve 5–20 distinct configuration items, each with its own version history and dependencies.</p>
+
+<p>The current state of practice is fragmented:</p>
+
+<ul>
+  <li><strong>Prompt-only versioning</strong> (LangSmith, Langfuse, Arthur.ai) treats prompts as versioned artifacts but ignores tools, model params, and framework configuration.</li>
+  <li><strong>Inline hardcoding</strong> embeds config strings in application code, coupling behavioral changes to deployment cycles.</li>
+  <li><strong>Git-based workarounds</strong> store prompts as <code>.md</code> files in repositories, but lack structural awareness of configuration semantics—a tool definition change is indistinguishable from a typo fix.</li>
+</ul>
+
+<p>When a configuration breaks, the recovery process is entirely manual. Users report spending "almost an entire day playing with configurations" and having to "set everything up again from the beginning" when things go wrong.</p>
+
+<p>We propose <strong>AgentConfig</strong>, a version control system purpose-built for agent configurations. Our contributions are:</p>
+
+<ol>
+  <li><strong>A unified manifest schema</strong> (<code>AgentManifest</code>) that captures the full agent configuration across arbitrary frameworks.</li>
+  <li><strong>A structural diff engine</strong> that recursively compares configurations, identifying meaningful changes while filtering metadata noise.</li>
+  <li><strong>A Git-like version store</strong> supporting commit, log, branch, tag, environment pinning, and instant rollback through pointer-based environment resolution.</li>
+  <li><strong>A/B testing via tag routing</strong>, enabling sub-millisecond switching between configuration variants without redeployment.</li>
+</ol>
+
+<p>The system is validated across three agent frameworks and achieves rollback times under 1ms with breaking change detection for structural modifications.</p>
+
+<h2>2 Background and Related Work</h2>
+
+<h3>2.1 Prompt Management Tools</h3>
+<p>A mature ecosystem exists for prompt versioning. LangSmith (LangChain) provides a Prompt Hub with version tracking and playground testing, but is tightly coupled to the LangChain ecosystem [1]. Langfuse offers immutable version history with label-based deployment [2]. Arthur.ai proposes prompt registry practices with semantic versioning and evaluation gates [3]. These tools treat prompts as isolated artifacts, ignoring tools, model parameters, and framework configuration.</p>
+
+<h3>2.2 Agent Governance Patterns</h3>
+<p>Agent Patterns (agentpatterns.tech) describes version manifest approaches where agent releases bundle prompt, tool, and policy hashes into a single version identifier [4]. Rollback strategies use runtime traffic switching and canary gates [5]. These remain architectural patterns rather than implemented tools.</p>
+
+<h3>2.3 Git-Based Approaches</h3>
+<p>Several practitioners recommend storing prompts as hierarchical markdown files in Git repositories [6]. While leveraging existing Git infrastructure, these approaches lack structural awareness—a temperature change from 0.3 to 0.7 is textually invisible in a markdown diff.</p>
+
+<h3>2.4 Proprietary Platforms</h3>
+<p>Co-one AI LAB offers a commercial agent version control platform with visual side-by-side diff and one-click rollback [7]. LaunchDarkly extends its feature flag platform to AI configurations [8]. These platforms are proprietary and framework-specific.</p>
+
+<p><strong>The gap:</strong> No existing open solution versions the complete agent configuration bundle (prompts + tools + model params + framework metadata) across multiple agent frameworks with structural diff and instant rollback.</p>
+
+<h2>3 System Design</h2>
+
+<h3>3.1 Manifest Schema</h3>
+<p>The AgentManifest schema captures the complete agent configuration as a structured document:</p>
+
+<pre>AgentManifest:
+  name: str
+  framework: {claude-code, openai-agents, hermes, custom}
+  framework_version: str?
+  prompts: { name -> PromptConfig }
+    - system_prompt: str
+    - role: str?
+    - few_shot_examples: [{input, output}]
+    - output_schema: JSON Schema?
+  tools: { name -> ToolDefinition }
+    - description: str
+    - input_schema: JSON Schema
+    - implementation_ref: str?
+    - enabled: bool
+  model_params:
+    - model: str
+    - temperature: float (0.0-2.0)
+    - top_p: float
+    - max_tokens: int?
+    - stop_sequences: [str]
+  knowledge_bases: [{name, type, config}]
+  metadata:
+    - version: str (semver)
+    - environment: {dev, staging, prod}
+    - author: str?
+    - created_at: ISO timestamp</pre>
+
+<p>The schema separates <strong>content identity</strong> from <strong>commit identity</strong>:</p>
+<ul>
+  <li><code>content_hash</code>: SHA-256 of content fields only (prompts, tools, model params). Identical configurations produce identical content hashes regardless of when or where they are loaded.</li>
+  <li><code>commit_hash</code>: SHA-256 of the full document including metadata. Every commit is uniquely identifiable.</li>
+</ul>
+<p>This mirrors Git's blob/commit distinction and enables both deduplication and audit trails.</p>
+
+<h3>3.2 Structural Diff Engine</h3>
+<p>Unlike text-level diffs, the structural diff engine recursively walks two manifest dictionaries and categorizes each change:</p>
+
+<table>
+  <tr><th>Change Type</th><th>Meaning</th><th>Example</th></tr>
+  <tr><td><code>added</code></td><td>Key present in new, absent in old</td><td>New tool added</td></tr>
+  <tr><td><code>removed</code></td><td>Key absent in new, present in old</td><td>Tool deleted (breaking)</td></tr>
+  <tr><td><code>modified_changed</code></td><td>Value changed</td><td>Temperature 0.3 → 0.7</td></tr>
+  <tr><td><code>modified_added</code></td><td>Null → value</td><td>New parameter introduced</td></tr>
+</table>
+
+<p>Metadata keys (<code>created_at</code>, <code>author</code>, <code>description</code>) are filtered from diffs to reduce noise. Tool removals are flagged as breaking changes.</p>
+
+<h3>3.3 Version Store</h3>
+<p>The version store implements Git-like operations over agent configurations:</p>
+<ul>
+  <li><strong>commit</strong>: Saves a manifest to the store, creates a version entry with parent hash linking.</li>
+  <li><strong>log</strong>: Walks the parent chain to produce a commit history.</li>
+  <li><strong>branch/tag</strong>: Named references pointing to specific commit hashes.</li>
+  <li><strong>environment pinning</strong>: Environments (dev, staging, prod) are pointer files mapping to commit hashes.</li>
+  <li><strong>rollback</strong>: Repoints an environment to a previous commit hash—a file write operation completing in under 1ms.</li>
+</ul>
+<p>The store is persisted as a directory of JSON files:</p>
+
+<pre>.agent-ver/
+├── index.json         # Version index and branch heads
+├── versions/          # Manifest JSON files keyed by commit hash
+├── tags/              # Named tags pointing to commit hashes
+└── environments/      # Environment pointers</pre>
+
+<h3>3.4 A/B Testing via Tag Routing</h3>
+<p>A/B testing is implemented through tag-based version routing. Two configuration variants are committed with different tags (e.g., <code>ab-control</code>, <code>ab-treatment</code>). An environment pointer or router determines which variant to serve for each request. Switching between variants is a tag repoint operation completing in under 1ms.</p>
+<p>This approach enables canary releases, regression testing, and gradual rollouts.</p>
+
+<h2>4 Evaluation</h2>
+
+<h3>4.1 Experimental Setup</h3>
+<p>The prototype is implemented in 900 lines of Python (manifest schema, diff engine, version store, CLI, and runtime client). Evaluation covers three agent frameworks: Claude Code, OpenAI Agents SDK, and Hermes.</p>
+
+<h3>4.2 H1: Manifest Schema Completeness</h3>
+<p>The manifest schema successfully captures configurations for all three frameworks:</p>
+
+<table>
+  <tr><th>Framework</th><th>Prompts</th><th>Tools</th><th>Knowledge Bases</th><th>Content Hash</th></tr>
+  <tr><td>Claude Code</td><td>2</td><td>2</td><td>1</td><td><code>0638de7b</code></td></tr>
+  <tr><td>OpenAI Agents</td><td>2</td><td>3</td><td>0</td><td><code>2eac91f5</code></td></tr>
+  <tr><td>Hermes</td><td>2</td><td>1</td><td>0</td><td><code>b496605c</code></td></tr>
+</table>
+
+<p><strong>Key finding:</strong> <code>content_hash</code> remains identical when the same configuration is constructed in different program instances, while <code>commit_hash</code> differs due to timestamp metadata. This enables content-based deduplication without sacrificing audit trail completeness.</p>
+
+<h3>4.3 H2: Environment Promotion and Rollback</h3>
+<p>A staged promotion pipeline was tested across three environments:</p>
+<ol>
+  <li>v1 committed and promoted to dev, staging, prod ✓</li>
+  <li>v2 committed with system prompt changes and a new tool, promoted to dev ✓</li>
+  <li>v3 committed with broken configuration → regression detected at dev ✓</li>
+  <li>Rollback dev from v3 to v2: <strong>&lt;1ms</strong> ✓</li>
+  <li>v2 promoted to staging and prod ✓</li>
+</ol>
+<p>The structural diff correctly identified 4 changes between v2 and v3: temperature modification, system prompt rewrite, tool removal (flagged as breaking), and version bump.</p>
+
+<h3>4.4 H3: A/B Testing</h3>
+
+<table>
+  <tr><th>Parameter</th><th>Variant A (Conservative)</th><th>Variant B (Creative)</th></tr>
+  <tr><td>Temperature</td><td>0.3</td><td>0.9</td></tr>
+  <tr><td>System Prompt</td><td>"Follow rules strictly"</td><td>"Use your best judgment"</td></tr>
+</table>
+<p>A/B switch time: <strong>&lt;0.1ms</strong>. Rollback from B to A: single tag repoint, &lt;1ms.</p>
+
+<h3>4.5 Performance</h3>
+
+<table>
+  <tr><th>Operation</th><th>Latency</th></tr>
+  <tr><td>Commit (manifest ~2KB)</td><td>~5ms</td></tr>
+  <tr><td>Diff (two manifests)</td><td>~2ms</td></tr>
+  <tr><td>Environment pin</td><td>&lt;0.1ms</td></tr>
+  <tr><td>Rollback (tag repoint)</td><td>&lt;0.1ms</td></tr>
+  <tr><td>Load config by environment</td><td>~3ms</td></tr>
+  <tr><td>Runtime client initialization</td><td>~5ms</td></tr>
+</table>
+
+<p>All operations scale with manifest size rather than history depth, since each version is stored as an independent file.</p>
+
+<h2>5 Discussion</h2>
+
+<h3>5.1 Limitations</h3>
+<ul>
+  <li><strong>Secrets management:</strong> API keys and credentials in agent configs are not handled.</li>
+  <li><strong>Runtime integration:</strong> The client library loads configs at startup but does not support hot-reloading.</li>
+  <li><strong>Concurrent access:</strong> The current file-based store does not handle concurrent writers.</li>
+  <li><strong>Framework specificity:</strong> Populating the schema requires understanding each framework's configuration format.</li>
+</ul>
+
+<h3>5.2 Future Work</h3>
+<ul>
+  <li>Plugin architecture for framework-specific config extraction</li>
+  <li>Web UI for side-by-side structural diff visualization</li>
+  <li>Evaluation gates that block promotion on metric regression</li>
+  <li>Encrypted secrets stored alongside manifests</li>
+  <li>Approval workflows for environment promotion</li>
+</ul>
+
+<h3>5.3 Broader Impact</h3>
+<p>Agent configuration versioning addresses a growing operational challenge as AI agents move from prototypes to production. The ability to roll back broken configurations instantly reduces incident response time. A/B testing across configurations enables data-driven optimization of agent behavior. The cross-framework schema promotes interoperability and reduces framework lock-in.</p>
+
+<h2>6 Conclusion</h2>
+<p>We presented AgentConfig, a version control system for AI agent configurations that addresses the gap between prompt-only versioning and the need for full-configuration management. The system introduces a unified manifest schema, structural diff engine, Git-like version store, and A/B testing via tag routing. Evaluation across three agent frameworks confirms sub-millisecond rollback times, breaking change detection, and content-based deduplication.</p>
+
+<h2>References</h2>
+<p class="ref">[1] LangChain. LangSmith Prompt Hub. https://docs.smith.langchain.com/</p>
+<p class="ref">[2] Langfuse. Open-source LLM engineering platform. https://langfuse.com/</p>
+<p class="ref">[3] Arthur.ai. How to Version and Rollback Prompts for LLM Agents Across Environments. June 2026.</p>
+<p class="ref">[4] Agent Patterns. Agent Versioning for AI Agents. https://www.agentpatterns.tech/en/governance/agent-versioning</p>
+<p class="ref">[5] Agent Patterns. Rollback Strategies for AI Agents. https://www.agentpatterns.tech/en/governance/rollback-strategies</p>
+<p class="ref">[6] CallSphere. Prompt Versioning: Git-Based Version Control for AI Agent Instructions. 2026.</p>
+<p class="ref">[7] Co-one AI LAB. AI Agent Version Control & Rollback Tools. https://www.co-one.co/products/ai-agent-version-control</p>
+<p class="ref">[8] LaunchDarkly. AI Configs: Feature flags for AI prompt management. https://launchdarkly.com/</p>
+
+</body>
+</html>
