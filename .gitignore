@@ -1,0 +1,24 @@
+# Research artifacts
+literature/
+to_human/
+paper/
+findings.md
+research-log.md
+research-state.yaml
+data/
+
+# Experiment non-code files
+experiments/**/protocol.md
+experiments/**/analysis.md
+experiments/**/results/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
