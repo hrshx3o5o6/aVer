@@ -31,7 +31,7 @@ if ! command -v pipx &>/dev/null; then
     else
         python3 -m pip install --user pipx
     fi
-    python3 -m pipx ensurepath
+    pipx ensurepath
     echo "  pipx installed. You may need to restart your shell for PATH changes."
 fi
 
