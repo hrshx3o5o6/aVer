@@ -11,8 +11,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .diff import ConfigDiff, diff_manifests
-from .manifest import AgentManifest
+from diff import ConfigDiff, diff_manifests
+from manifest import AgentManifest
 
 
 class VersionEntry:

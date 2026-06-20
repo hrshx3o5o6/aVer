@@ -9,8 +9,8 @@ import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from .manifest import AgentManifest
-from .version_store import VersionStore
+from manifest import AgentManifest
+from version_store import VersionStore
 
 
 _STORE_PATH = os.environ.get("AGENT_VER_STORE", ".agent-ver")

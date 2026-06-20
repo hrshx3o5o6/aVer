@@ -16,14 +16,14 @@ try:
 except ImportError:
     yaml = None
 
-from .manifest import (
+from manifest import (
     AgentManifest,
     FrameworkType,
     ModelParams,
     PromptConfig,
     ToolDefinition,
 )
-from .version_store import VersionStore
+from version_store import VersionStore
 
 
 HERMES_CONFIG = Path.home() / ".hermes" / "config.yaml"

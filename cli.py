@@ -12,9 +12,9 @@ import sys
 from pathlib import Path
 from typing import Dict, Optional
 
-from .manifest import AgentManifest, FrameworkType
-from .version_store import VersionStore
-from .interactive import auto_detect_import, FRAMEWORK_NAMES, EXPORT_FORMATS
+from manifest import AgentManifest, FrameworkType
+from version_store import VersionStore
+from interactive import auto_detect_import, FRAMEWORK_NAMES, EXPORT_FORMATS
 
 
 DEFAULT_STORE = ".agent-ver"
@@ -203,7 +203,7 @@ def cmd_init_manifest(args):
 
 
 def cmd_import_hermes(args):
-    from .hermes_bridge import import_from_hermes
+    from hermes_bridge import import_from_hermes
 
     store = find_store()
     if not store:
@@ -230,7 +230,7 @@ def cmd_import_hermes(args):
 
 
 def cmd_export_hermes(args):
-    from .hermes_bridge import export_to_hermes
+    from hermes_bridge import export_to_hermes
 
     store = find_store()
     if not store:
@@ -252,7 +252,7 @@ def cmd_export_hermes(args):
 
 
 def cmd_import_claude_code(args):
-    from .claude_code_bridge import import_from_claude_code
+    from claude_code_bridge import import_from_claude_code
 
     store = find_store()
     if not store:
@@ -283,7 +283,7 @@ def cmd_import_claude_code(args):
 
 
 def cmd_export_claude_code(args):
-    from .claude_code_bridge import export_to_claude_code
+    from claude_code_bridge import export_to_claude_code
 
     store = find_store()
     if not store:
@@ -305,7 +305,7 @@ def cmd_export_claude_code(args):
 
 
 def cmd_import_opencode(args):
-    from .opencode_bridge import import_from_opencode
+    from opencode_bridge import import_from_opencode
 
     store = find_store()
     if not store:
@@ -333,7 +333,7 @@ def cmd_import_opencode(args):
 
 
 def cmd_export_opencode(args):
-    from .opencode_bridge import export_to_opencode
+    from opencode_bridge import export_to_opencode
 
     store = find_store()
     if not store:
@@ -355,7 +355,7 @@ def cmd_export_opencode(args):
 
 
 def cmd_import_zen(args):
-    from .zen_bridge import import_from_zen
+    from zen_bridge import import_from_zen
 
     store = find_store()
     if not store:
@@ -382,7 +382,7 @@ def cmd_import_zen(args):
 
 
 def cmd_export_zen(args):
-    from .zen_bridge import export_to_zen
+    from zen_bridge import export_to_zen
 
     store = find_store()
     if not store:
@@ -404,7 +404,7 @@ def cmd_export_zen(args):
 
 
 def cmd_import_phi(args):
-    from .phi_bridge import import_from_phi
+    from phi_bridge import import_from_phi
 
     store = find_store()
     if not store:
@@ -432,7 +432,7 @@ def cmd_import_phi(args):
 
 
 def cmd_export_phi(args):
-    from .phi_bridge import export_to_phi
+    from phi_bridge import export_to_phi
 
     store = find_store()
     if not store:
@@ -520,11 +520,11 @@ def _run_import(framework_key: str, env: str, version: str, store):
             print("  Nothing detected.")
             return
 
-    from .hermes_bridge import import_from_hermes
-    from .claude_code_bridge import import_from_claude_code
-    from .opencode_bridge import import_from_opencode
-    from .zen_bridge import import_from_zen
-    from .phi_bridge import import_from_phi
+    from hermes_bridge import import_from_hermes
+    from claude_code_bridge import import_from_claude_code
+    from opencode_bridge import import_from_opencode
+    from zen_bridge import import_from_zen
+    from phi_bridge import import_from_phi
 
     imports = {
         "hermes": ("Hermes", lambda: import_from_hermes(store=store, version=version, environment=env)),
@@ -580,11 +580,11 @@ def cmd_export_interactive(args):
         print("  Cancelled.")
         return 1
 
-    from .hermes_bridge import export_to_hermes
-    from .claude_code_bridge import export_to_claude_code
-    from .opencode_bridge import export_to_opencode
-    from .zen_bridge import export_to_zen
-    from .phi_bridge import export_to_phi
+    from hermes_bridge import export_to_hermes
+    from claude_code_bridge import export_to_claude_code
+    from opencode_bridge import export_to_opencode
+    from zen_bridge import export_to_zen
+    from phi_bridge import export_to_phi
 
     exporters = {
         "hermes": lambda: export_to_hermes(manifest),
