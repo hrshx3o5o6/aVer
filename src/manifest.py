@@ -16,6 +16,9 @@ class FrameworkType(str, Enum):
     CLAUDE_CODE = "claude-code"
     OPENAI_AGENTS = "openai-agents"
     HERMES = "hermes"
+    OPENCODE = "opencode"
+    ZEN = "zen"
+    PHI = "phi"
     CUSTOM = "custom"
 
 
@@ -97,16 +100,16 @@ class AgentManifest:
     def from_dict(cls, data: Dict[str, Any]) -> "AgentManifest":
         framework = FrameworkType(data["framework"])
         prompts = {
-            k: PromptConfig(**v) for k, v in data.get("prompts", {}).items()
+            k: PromptConfig(**v) for k, v in (data.get("prompts") or {}).items()
         }
         tools = {
-            k: ToolDefinition(**v) for k, v in data.get("tools", {}).items()
+            k: ToolDefinition(**v) for k, v in (data.get("tools") or {}).items()
         }
         model_params = (
             ModelParams(**data["model_params"]) if data.get("model_params") else None
         )
         knowledge_bases = [
-            KnowledgeBaseRef(**kb) for kb in data.get("knowledge_bases", [])
+            KnowledgeBaseRef(**kb) for kb in (data.get("knowledge_bases") or [])
         ]
         return cls(
             name=data["name"],
