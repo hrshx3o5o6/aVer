@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="https://github.com/you/aver.git"
+REPO="https://github.com/hrshx3o5o6/aVer.git"
 TAG="${1:-main}"
 
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then

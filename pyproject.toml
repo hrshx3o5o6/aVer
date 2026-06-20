@@ -28,8 +28,8 @@ classifiers = [
 dependencies = ["pyyaml"]
 
 [project.urls]
-Homepage = "https://github.com/you/aver"
-Repository = "https://github.com/you/aver"
+Homepage = "https://github.com/hrshx3o5o6/aVer"
+Repository = "https://github.com/hrshx3o5o6/aVer"
 
 [project.scripts]
 aver = "cli:main"
