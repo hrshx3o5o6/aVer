@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Dict, Optional
 
 from manifest import AgentManifest, FrameworkType
-from version_store import VersionStore
+from version_store import ClubCommit, VersionStore
 from interactive import auto_detect_import, FRAMEWORK_NAMES, EXPORT_FORMATS
 
 
@@ -35,45 +35,67 @@ def cmd_init(args):
 
 
 def cmd_commit(args):
+    import contextlib
+
     store = find_store()
     if not store:
-        print("Error: not an agent-ver store. Run 'agent-ver init' first.", file=sys.stderr)
+        store = VersionStore(DEFAULT_STORE)
+        store._save_index()
+
+    from bridges.hermes_bridge import import_from_hermes
+    from bridges.claude_code_bridge import import_from_claude_code
+    from bridges.opencode_bridge import import_from_opencode
+    from bridges.zen_bridge import import_from_zen
+    from bridges.phi_bridge import import_from_phi
+
+    manifests = {}
+
+    scan = [
+        ("hermes", "Hermes", lambda: import_from_hermes(store=store)),
+        ("claude-code", "Claude Code", lambda: import_from_claude_code(store=store)),
+        ("opencode", "OpenCode", lambda: import_from_opencode(store=store)),
+        ("zen", "Zen", lambda: import_from_zen(store=store)),
+        ("phi", "Phi", lambda: import_from_phi(store=store)),
+    ]
+
+    for fw, label, fn in scan:
+        with contextlib.redirect_stdout(None), contextlib.redirect_stderr(None):
+            try:
+                m = fn()
+            except Exception:
+                m = None
+        if m:
+            manifests[fw] = m
+
+    if not manifests:
+        print("No supported config files found in this project.")
         return 1
-
-    if not args.file:
-        print("Error: --file is required", file=sys.stderr)
-        return 1
-
-    manifest_path = Path(args.file)
-    if not manifest_path.exists():
-        print(f"Error: file not found: {args.file}", file=sys.stderr)
-        return 1
-
-    manifest = AgentManifest.from_json(manifest_path.read_text())
-
-    if args.env:
-        manifest.environment = args.env
-    if args.version:
-        manifest.version = args.version
 
     tags = args.tag.split(",") if args.tag else []
-    h = store.commit(manifest, message=args.message, tags=tags, author=args.author)
-    print(f"Committed: {h}")
+    fw_list = ", ".join(sorted(manifests.keys()))
+    msg = args.message or f"Snapshot ({fw_list})"
+    h = store.club_commit(manifests, message=msg, tags=tags)
+    print(f"Committed {h[:12]} ({len(manifests)} frameworks: {fw_list})")
     return 0
 
 
 def cmd_log(args):
     store = find_store()
     if not store:
-        print("Error: not an agent-ver store. Run 'agent-ver init' first.", file=sys.stderr)
+        print("Error: not an agent-ver store. Run 'aver init' first.", file=sys.stderr)
         return 1
 
     entries = store.log(branch=args.branch, max_count=args.count)
-    print(f"{'HASH':<20} {'VERSION':<12} {'DATE':<24} {'MESSAGE'}")
-    print("-" * 80)
+    print(f"{'HASH':<14} {'FRAMEWORKS':<40} {'DATE':<22} {'MESSAGE'}")
+    print("-" * 90)
     for e in entries:
-        ts = e.timestamp[:19] if e.timestamp else ""
-        print(f"{e.hash:<20} {e.version:<12} {ts:<24} {e.message}")
+        if isinstance(e, ClubCommit):
+            fws = ", ".join(sorted(e.members.keys()))
+            ts = e.timestamp[:19] if e.timestamp else ""
+            print(f"{e.hash:<14} {fws:<40} {ts:<22} {e.message}")
+        else:
+            ts = e.timestamp[:19] if e.timestamp else ""
+            print(f"{e.hash:<14} {e.version:<40} {ts:<22} {e.message}")
     return 0
 
 
@@ -101,6 +123,47 @@ def cmd_diff(args):
     return 0
 
 
+def cmd_checkout(args):
+    store = find_store()
+    if not store:
+        print("Error: not an agent-ver store. Run 'aver init' first.", file=sys.stderr)
+        return 1
+
+    manifests = store.get_manifests(args.ref)
+    if not manifests:
+        print(f"Error: nothing found at '{args.ref}'", file=sys.stderr)
+        return 1
+
+    from bridges.hermes_bridge import export_to_hermes
+    from bridges.claude_code_bridge import export_to_claude_code
+    from bridges.opencode_bridge import export_to_opencode
+    from bridges.zen_bridge import export_to_zen
+    from bridges.phi_bridge import export_to_phi
+
+    exporters = {
+        "hermes": export_to_hermes,
+        "claude-code": export_to_claude_code,
+        "opencode": export_to_opencode,
+        "zen": export_to_zen,
+        "phi": export_to_phi,
+    }
+
+    restored = []
+    for fw, manifest in manifests.items():
+        fn = exporters.get(fw)
+        if fn:
+            try:
+                path = fn(manifest)
+                restored.append(fw)
+                print(f"  ✓ {fw} → {path}")
+            except Exception as e:
+                print(f"  ✗ {fw}: {e}", file=sys.stderr)
+
+    if restored:
+        print(f"\nRestored {len(restored)} framework config{'s' if len(restored) > 1 else ''}")
+    return 0
+
+
 def cmd_deploy(args):
     store = find_store()
     if not store:
@@ -113,16 +176,21 @@ def cmd_deploy(args):
         return 1
 
     store.pin_environment(args.environment, resolved)
-    manifest = store.get_manifest(resolved)
-    version = manifest.version if manifest else "?"
-    print(f"Deployed {resolved} (v{version}) → environment '{args.environment}'")
+    if store.is_club_commit(resolved):
+        club = store.get_club_commit(resolved)
+        fws = ", ".join(sorted(club.members.keys())) if club else "?"
+        print(f"Deployed {resolved[:12]} ({fws}) → environment '{args.environment}'")
+    else:
+        manifest = store.get_manifest(resolved)
+        version = manifest.version if manifest else "?"
+        print(f"Deployed {resolved[:12]} (v{version}) → environment '{args.environment}'")
     return 0
 
 
 def cmd_rollback(args):
     store = find_store()
     if not store:
-        print("Error: not an agent-ver store. Run 'agent-ver init' first.", file=sys.stderr)
+        print("Error: not an agent-ver store. Run 'aver init' first.", file=sys.stderr)
         return 1
 
     resolved = store.resolve(args.ref)
@@ -136,16 +204,21 @@ def cmd_rollback(args):
         print(f"Error: rollback failed", file=sys.stderr)
         return 1
 
-    manifest = store.get_manifest(rolled)
-    version = manifest.version if manifest else "?"
-    print(f"Rollback '{args.environment}': {current or 'none'} → {rolled} (v{version})")
+    if store.is_club_commit(rolled):
+        club = store.get_club_commit(rolled)
+        fws = ", ".join(sorted(club.members.keys())) if club else "?"
+        print(f"Rollback '{args.environment}': {current or 'none'} → {rolled[:12]} ({fws})")
+    else:
+        manifest = store.get_manifest(rolled)
+        version = manifest.version if manifest else "?"
+        print(f"Rollback '{args.environment}': {current or 'none'} → {rolled[:12]} (v{version})")
     return 0
 
 
 def cmd_status(args):
     store = find_store()
     if not store:
-        print("Error: not an agent-ver store. Run 'agent-ver init' first.", file=sys.stderr)
+        print("Error: not an agent-ver store. Run 'aver init' first.", file=sys.stderr)
         return 1
 
     envs_dir = Path(DEFAULT_STORE) / "environments"
@@ -154,16 +227,26 @@ def cmd_status(args):
         for env_file in sorted(envs_dir.iterdir()):
             if env_file.is_file():
                 h = env_file.read_text().strip()
-                manifest = store.get_manifest(h)
-                version = manifest.version if manifest else "?"
-                print(f"  {env_file.name:<20} → {h[:12]} (v{version})")
+                if store.is_club_commit(h):
+                    club = store.get_club_commit(h)
+                    fws = ", ".join(sorted(club.members.keys())) if club else "?"
+                    print(f"  {env_file.name:<20} → {h[:12]} ({fws})")
+                else:
+                    manifest = store.get_manifest(h)
+                    version = manifest.version if manifest else "?"
+                    print(f"  {env_file.name:<20} → {h[:12]} (v{version})")
 
     print(f"\nBranches:")
     for branch, head in store._heads.items():
         if head:
-            manifest = store.get_manifest(head)
-            version = manifest.version if manifest else "?"
-            print(f"  {branch:<20} → {head[:12]} (v{version})")
+            if store.is_club_commit(head):
+                club = store.get_club_commit(head)
+                fws = ", ".join(sorted(club.members.keys())) if club else "?"
+                print(f"  {branch:<20} → {head[:12]} ({fws})")
+            else:
+                manifest = store.get_manifest(head)
+                version = manifest.version if manifest else "?"
+                print(f"  {branch:<20} → {head[:12]} (v{version})")
 
     print(f"\nTags:")
     tags_dir = Path(DEFAULT_STORE) / "tags"
@@ -171,10 +254,16 @@ def cmd_status(args):
         for tag_file in sorted(tags_dir.iterdir()):
             if tag_file.is_file():
                 h = tag_file.read_text().strip()
-                print(f"  {tag_file.name:<20} → {h[:12]}")
+                if store.is_club_commit(h):
+                    club = store.get_club_commit(h)
+                    fws = ", ".join(sorted(club.members.keys())) if club else "?"
+                    print(f"  {tag_file.name:<20} → {h[:12]} ({fws})")
+                else:
+                    print(f"  {tag_file.name:<20} → {h[:12]}")
 
     all_versions = store.log_all()
-    print(f"\nTotal versions: {len(all_versions)}")
+    count = len(all_versions)
+    print(f"\nTotal versions: {count}")
     return 0
 
 
@@ -672,17 +761,16 @@ def main():
     ep = export_sub.add_parser("phi", help="Export to Phi config files")
     ep.add_argument("--output-dir", "-o", default=None, help="Output directory")
 
-    p_init = sub.add_parser("init", help="Initialize agent-ver store")
+    p_init = sub.add_parser("init", help="Initialize a new store")
 
-    p_commit = sub.add_parser("commit", help="Commit an agent config manifest")
-    p_commit.add_argument("--file", "-f", required=True, help="Path to manifest JSON file")
-    p_commit.add_argument("--message", "-m", default="commit", help="Commit message")
+    p_commit = sub.add_parser("commit", help="Snapshot ALL agent configs in this project")
+    p_commit.add_argument("--message", "-m", help="Commit message (auto-generated if omitted)")
     p_commit.add_argument("--tag", "-t", help="Comma-separated tags")
-    p_commit.add_argument("--author", "-a", help="Author name")
-    p_commit.add_argument("--version", help="Override version string")
-    p_commit.add_argument("--env", help="Override environment")
 
-    p_log = sub.add_parser("log", help="Show commit log")
+    p_checkout = sub.add_parser("checkout", help="Restore ALL configs from a previous commit")
+    p_checkout.add_argument("ref", help="Ref to restore (hash, tag, or environment)")
+
+    p_log = sub.add_parser("log", help="Show commit history")
     p_log.add_argument("--branch", default="main", help="Branch name")
     p_log.add_argument("--count", "-n", type=int, default=20, help="Max entries")
 
@@ -690,13 +778,13 @@ def main():
     p_diff.add_argument("ref_a", help="First ref (hash, tag, branch, or env)")
     p_diff.add_argument("ref_b", help="Second ref")
 
-    p_deploy = sub.add_parser("deploy", help="Deploy a version to an environment")
-    p_deploy.add_argument("environment", help="Environment name (dev, staging, prod)")
+    p_deploy = sub.add_parser("deploy", help="Point an environment to a version")
+    p_deploy.add_argument("environment", help="Environment name")
     p_deploy.add_argument("ref", help="Ref to deploy (hash, tag)")
 
     p_rollback = sub.add_parser("rollback", help="Rollback an environment to a version")
     p_rollback.add_argument("environment", help="Environment name")
-    p_rollback.add_argument("ref", help="Target ref for rollback")
+    p_rollback.add_argument("ref", help="Target ref")
 
     p_status = sub.add_parser("status", help="Show store status")
 
@@ -729,6 +817,7 @@ def main():
     cmd_map = {
         "init": cmd_init,
         "commit": cmd_commit,
+        "checkout": cmd_checkout,
         "log": cmd_log,
         "diff": cmd_diff,
         "deploy": cmd_deploy,
