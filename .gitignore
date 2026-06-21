@@ -23,8 +23,7 @@ __pycache__/
 dist/
 build/
 
-# Marketing / README (never commit)
-README.md
+# Marketing / README (never commit) — now committed
 
 # OS
 .DS_Store
