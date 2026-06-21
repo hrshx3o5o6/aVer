@@ -1,6 +1,6 @@
 <p align="center">
   <!-- Replace with your logo: <img src="assets/logo.png" width="200" alt="aVer logo"> -->
-  <img src="https://raw.githubusercontent.com/hrshx3o5o6/aVer/main/assets/logo.svg" width="200" alt="aVer">
+  <img src="https://raw.githubusercontent.com/hrshx3o5o6/aVer/main/assets/aver-logo.png" width="200" alt="aVer">
 </p>
 
 <h1 align="center">aVer</h1>
