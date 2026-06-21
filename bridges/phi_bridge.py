@@ -151,8 +151,6 @@ def import_from_phi(
             author="agent-ver-import",
         )
         store.pin_environment(environment, h)
-        print(f"Committed: {h}")
-        print(f"Pinned '{environment}' → {h}")
 
     return manifest
 

@@ -24,7 +24,7 @@ OPENCODE_GLOBAL = Path.home() / ".config" / "opencode" / "opencode.json"
 OPENCODE_GLOBAL_DIR = Path.home() / ".config" / "opencode"
 
 
-def _find_opencode_json(project_root: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+def _find_opencode_json(project_root: Optional[Path] = None, local_only: bool = False) -> Optional[Dict[str, Any]]:
     if project_root:
         for name in ("opencode.json", "opencode.jsonc"):
             p = project_root / name
@@ -36,12 +36,12 @@ def _find_opencode_json(project_root: Optional[Path] = None) -> Optional[Dict[st
             p = parent / name
             if p.exists():
                 return json.loads(p.read_text())
-    if OPENCODE_GLOBAL.exists():
+    if not local_only and OPENCODE_GLOBAL.exists():
         return json.loads(OPENCODE_GLOBAL.read_text())
     return None
 
 
-def _find_opencode_dir(project_root: Optional[Path] = None) -> Optional[Path]:
+def _find_opencode_dir(project_root: Optional[Path] = None, local_only: bool = False) -> Optional[Path]:
     if project_root:
         d = project_root / ".opencode"
         if d.is_dir():
@@ -51,7 +51,7 @@ def _find_opencode_dir(project_root: Optional[Path] = None) -> Optional[Path]:
         d = parent / ".opencode"
         if d.is_dir():
             return d
-    if OPENCODE_GLOBAL_DIR.is_dir():
+    if not local_only and OPENCODE_GLOBAL_DIR.is_dir():
         return OPENCODE_GLOBAL_DIR
     return None
 
@@ -74,6 +74,7 @@ def import_from_opencode(
     version: str = "1.0.0",
     environment: str = "current",
     commit_message: str = "Imported from OpenCode config",
+    local_only: bool = False,
 ) -> Optional[AgentManifest]:
     root = Path(project_root) if project_root else None
 
@@ -83,19 +84,18 @@ def import_from_opencode(
         if c:
             config = c
     else:
-        c = _find_opencode_json(root)
+        c = _find_opencode_json(root, local_only=local_only)
         if c:
             config = c
 
     if not config:
-        print("No opencode.json found")
         return None
 
     opencode_path: Optional[Path] = None
     if opencode_dir:
         opencode_path = Path(opencode_dir)
     else:
-        opencode_path = _find_opencode_dir(root)
+        opencode_path = _find_opencode_dir(root, local_only=local_only)
 
     model_name = config.get("model", "")
     small_model = config.get("small_model", "")
@@ -178,6 +178,9 @@ def import_from_opencode(
         },
     )
 
+    if not config and not prompts and not tools:
+        return None
+
     if store:
         h = store.commit(
             manifest,
@@ -186,8 +189,6 @@ def import_from_opencode(
             author="agent-ver-import",
         )
         store.pin_environment(environment, h)
-        print(f"Committed: {h}")
-        print(f"Pinned '{environment}' → {h}")
 
     return manifest
 

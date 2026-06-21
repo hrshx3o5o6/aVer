@@ -35,8 +35,6 @@ def cmd_init(args):
 
 
 def cmd_commit(args):
-    import contextlib
-
     store = find_store()
     if not store:
         store = VersionStore(DEFAULT_STORE)
@@ -52,30 +50,33 @@ def cmd_commit(args):
 
     scan = [
         ("hermes", "Hermes", lambda: import_from_hermes(store=store)),
-        ("claude-code", "Claude Code", lambda: import_from_claude_code(store=store)),
-        ("opencode", "OpenCode", lambda: import_from_opencode(store=store)),
-        ("zen", "Zen", lambda: import_from_zen(store=store)),
+        ("claude-code", "Claude Code", lambda: import_from_claude_code(store=store, local_only=True)),
+        ("opencode", "OpenCode", lambda: import_from_opencode(store=store, local_only=True)),
+        ("zen", "Zen", lambda: import_from_zen(store=store, local_only=True)),
         ("phi", "Phi", lambda: import_from_phi(store=store)),
     ]
 
+    print("Scanning for config files...")
     for fw, label, fn in scan:
-        with contextlib.redirect_stdout(None), contextlib.redirect_stderr(None):
-            try:
-                m = fn()
-            except Exception:
-                m = None
+        try:
+            m = fn()
+        except Exception:
+            m = None
         if m:
+            print(f"  ✓ {label}")
             manifests[fw] = m
+        else:
+            print(f"  - {label} (no config found)")
 
     if not manifests:
-        print("No supported config files found in this project.")
+        print("\nNo supported config files found in this project.")
         return 1
 
     tags = args.tag.split(",") if args.tag else []
     fw_list = ", ".join(sorted(manifests.keys()))
     msg = args.message or f"Snapshot ({fw_list})"
     h = store.club_commit(manifests, message=msg, tags=tags)
-    print(f"Committed {h[:12]} ({len(manifests)} frameworks: {fw_list})")
+    print(f"\nCommitted {h[:12]} ({len(manifests)} frameworks: {fw_list})")
     return 0
 
 

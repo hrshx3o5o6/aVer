@@ -27,12 +27,11 @@ except ImportError:
     yaml = None
 
 
-def _find_zenflow_yaml(project_root: Optional[Path] = None) -> Optional[Dict[str, Any]]:
+def _find_zenflow_yaml(project_root: Optional[Path] = None, local_only: bool = False) -> Optional[Dict[str, Any]]:
     search_dirs = [project_root] if project_root else []
-    search_dirs.extend([
-        Path.cwd(),
-        Path.home() / ".zenflow",
-    ])
+    search_dirs.append(Path.cwd())
+    if not local_only:
+        search_dirs.append(Path.home() / ".zenflow")
     for base in search_dirs:
         if base is None:
             continue
@@ -48,13 +47,12 @@ def _find_zenflow_yaml(project_root: Optional[Path] = None) -> Optional[Dict[str
     return None
 
 
-def _find_zen_agents(project_root: Optional[Path] = None) -> List[Dict[str, Any]]:
+def _find_zen_agents(project_root: Optional[Path] = None, local_only: bool = False) -> List[Dict[str, Any]]:
     agents = []
     search_dirs = [project_root] if project_root else []
-    search_dirs.extend([
-        Path.cwd(),
-        Path.home() / ".zenflow",
-    ])
+    search_dirs.append(Path.cwd())
+    if not local_only:
+        search_dirs.append(Path.home() / ".zenflow")
     for base in search_dirs:
         if base is None:
             continue
@@ -79,6 +77,7 @@ def import_from_zen(
     version: str = "1.0.0",
     environment: str = "current",
     commit_message: str = "Imported from Zen/zenflow config",
+    local_only: bool = False,
 ) -> Optional[AgentManifest]:
     root = Path(project_root) if project_root else None
 
@@ -91,12 +90,11 @@ def import_from_zen(
             elif yaml:
                 config = yaml.safe_load(p.read_text())
     else:
-        c = _find_zenflow_yaml(root)
+        c = _find_zenflow_yaml(root, local_only=local_only)
         if c:
             config = c
 
     if not config:
-        print("No zenflow config found")
         return None
 
     agent_configs = config.get("agents", config.get("agents", {}))
@@ -134,7 +132,7 @@ def import_from_zen(
         model=first_model or config.get("model", config.get("model", "")),
     )
 
-    for agent in _find_zen_agents(root):
+    for agent in _find_zen_agents(root, local_only=local_only):
         name = agent.get("name", agent.get("id", "unnamed"))
         if name not in prompts:
             prompt_text = agent.get("prompt", agent.get("instructions", agent.get("system_prompt", "")))
@@ -176,8 +174,6 @@ def import_from_zen(
             author="agent-ver-import",
         )
         store.pin_environment(environment, h)
-        print(f"Committed: {h}")
-        print(f"Pinned '{environment}' → {h}")
 
     return manifest
 

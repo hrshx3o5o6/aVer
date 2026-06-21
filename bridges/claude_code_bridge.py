@@ -36,14 +36,15 @@ def _read_json(path: Path) -> Optional[Dict[str, Any]]:
     return json.loads(path.read_text())
 
 
-def _find_claude_md(project_root: Path) -> Optional[str]:
+def _find_claude_md(project_root: Path, local_only: bool = False) -> Optional[str]:
     for name in ("CLAUDE.md", ".claude/CLAUDE.md"):
         p = project_root / name
         if p.exists():
             return p.read_text()
-    user_claude = Path.home() / ".claude" / "CLAUDE.md"
-    if user_claude.exists():
-        return user_claude.read_text()
+    if not local_only:
+        user_claude = Path.home() / ".claude" / "CLAUDE.md"
+        if user_claude.exists():
+            return user_claude.read_text()
     return None
 
 
@@ -56,6 +57,7 @@ def import_from_claude_code(
     version: str = "1.0.0",
     environment: str = "current",
     commit_message: str = "Imported from Claude Code config",
+    local_only: bool = False,
 ) -> Optional[AgentManifest]:
     root = Path(project_root) if project_root else _find_project_root()
 
@@ -65,10 +67,10 @@ def import_from_claude_code(
         if s:
             settings = s
     else:
-        for p in [
-            root / ".claude" / "settings.json",
-            Path.home() / ".claude" / "settings.json",
-        ]:
+        candidates = [root / ".claude" / "settings.json"]
+        if not local_only:
+            candidates.append(Path.home() / ".claude" / "settings.json")
+        for p in candidates:
             s = _read_json(p)
             if s:
                 settings = s
@@ -90,7 +92,7 @@ def import_from_claude_code(
         if p.exists():
             claude_md_text = p.read_text()
     else:
-        claude_md_text = _find_claude_md(root)
+        claude_md_text = _find_claude_md(root, local_only=local_only)
 
     model_name = settings.get("model", "")
     prompts: Dict[str, PromptConfig] = {}
@@ -136,6 +138,9 @@ def import_from_claude_code(
         },
     )
 
+    if not settings and not claude_md_text and not mcp_servers:
+        return None
+
     if store:
         h = store.commit(
             manifest,
@@ -144,8 +149,6 @@ def import_from_claude_code(
             author="agent-ver-import",
         )
         store.pin_environment(environment, h)
-        print(f"Committed: {h}")
-        print(f"Pinned '{environment}' → {h}")
 
     return manifest
 
