@@ -14,7 +14,7 @@ from typing import Dict, Optional
 
 from manifest import AgentManifest, FrameworkType
 from version_store import ClubCommit, VersionStore
-from interactive import auto_detect_import, FRAMEWORK_NAMES, EXPORT_FORMATS
+from interactive import auto_detect_import, commit_picker, FRAMEWORK_NAMES, EXPORT_FORMATS
 
 
 DEFAULT_STORE = ".agent-ver"
@@ -46,8 +46,6 @@ def cmd_commit(args):
     from bridges.zen_bridge import import_from_zen
     from bridges.phi_bridge import import_from_phi
 
-    manifests = {}
-
     scan = [
         ("hermes", "Hermes", lambda: import_from_hermes(store=store)),
         ("claude-code", "Claude Code", lambda: import_from_claude_code(store=store, local_only=True)),
@@ -57,19 +55,33 @@ def cmd_commit(args):
     ]
 
     print("Scanning for config files...")
+    results = {}
     for fw, label, fn in scan:
         try:
             m = fn()
         except Exception:
             m = None
-        if m:
-            print(f"  ✓ {label}")
+        results[fw] = {"label": label, "manifest": m}
+        print(f"  {'✓' if m else '-'} {label}" + ("" if m else " (no config found in current directory)"))
+
+    if not any(r["manifest"] for r in results.values()):
+        print("\nNo supported config files found in this project.")
+        return 1
+
+    picker_items = [
+        {"key": fw, "label": info["label"], "detected": info["manifest"] is not None}
+        for fw, info in results.items()
+    ]
+    selected = commit_picker(picker_items)
+
+    manifests = {}
+    for fw in selected:
+        m = results[fw]["manifest"]
+        if m is not None:
             manifests[fw] = m
-        else:
-            print(f"  - {label} (no config found)")
 
     if not manifests:
-        print("\nNo supported config files found in this project.")
+        print("Nothing selected. Commit cancelled.")
         return 1
 
     tags = args.tag.split(",") if args.tag else []
