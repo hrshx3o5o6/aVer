@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO="https://github.com/hrshx3o5o6/aVer.git"
-TAG="${1:-main}"
-
 if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     echo "Usage: curl -fsSL https://github.com/hrshx3o5o6/aVer/raw/main/install.sh | bash"
-    echo "       curl -fsSL https://github.com/hrshx3o5o6/aVer/raw/main/install.sh | bash -s v0.1.0"
     echo ""
     echo "Installs 'aver' — version control for AI agent configurations."
     echo "Requires Python 3.10+ (pipx installed automatically if missing)."
@@ -38,12 +34,10 @@ if ! command -v pipx &>/dev/null; then
     if python3 -m pip install --user pipx 2>/dev/null || \
        python3 -m pip install --user --break-system-packages pipx 2>/dev/null; then
         pipx ensurepath 2>/dev/null || true
-        # pipx may not be on PATH yet after --user install
         if ! command -v pipx &>/dev/null; then
             if [ -f "$HOME/.local/bin/pipx" ]; then
                 PIPX_CMD="$HOME/.local/bin/pipx"
             else
-                # fallback: use python module
                 PIPX_CMD="python3 -m pipx"
             fi
         fi
@@ -70,37 +64,15 @@ if ! command -v pipx &>/dev/null; then
     echo "  Done."
 fi
 
-# --- git ---
-if ! command -v git &>/dev/null; then
-    echo "==> Installing git..."
-    if command -v apt &>/dev/null; then
-        sudo apt update -qq && sudo DEBIAN_FRONTEND=noninteractive apt install -y -qq git
-    elif command -v dnf &>/dev/null; then
-        sudo dnf install -y git
-    elif command -v brew &>/dev/null; then
-        brew install git
-    else
-        echo "Error: git required. Install from: https://git-scm.com/downloads" >&2
-        exit 1
-    fi
-    echo "  Done."
-fi
-
-# --- install aver ---
-echo "==> Installing aver from $REPO ($TAG)..."
-TMP_DIR=$(mktemp -d)
-git clone --depth=1 --branch "$TAG" "$REPO" "$TMP_DIR" 2>/dev/null || \
-git clone --depth=1 "$REPO" "$TMP_DIR"
-
-$PIPX_CMD install "$TMP_DIR"
-rm -rf "$TMP_DIR"
+# --- install aver from PyPI ---
+echo "==> Installing aver from PyPI..."
+$PIPX_CMD install aver-cli
 
 echo ""
 echo "  ✓ aver installed!"
 echo ""
 echo "  Quick start:"
 echo "    aver init              Initialize a new store"
-echo "    aver import            Import config from a framework"
-echo "    aver import hermes     Import Hermes config directly"
+echo "    aver commit            Snapshot all detected configs"
 echo "    aver status            Show store status"
 echo "    aver --help            Show all commands"
