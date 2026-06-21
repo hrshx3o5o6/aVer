@@ -14,8 +14,8 @@ aver init
 # Snapshot configs for all detected agents
 aver commit -m "Working setup"
 
-# Or install directly from GitHub
-pipx install git+https://github.com/hrshx3o5o6/aVer.git
+# Or install from PyPI
+pipx install aver-cli
 ```
 
 ## Quick start

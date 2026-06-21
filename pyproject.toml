@@ -3,12 +3,12 @@ requires = ["setuptools>=64"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "aver"
+name = "aver-cli"
 version = "0.1.0"
 description = "Version control for AI agent configurations across Hermes, Claude Code, OpenCode, Zen, and Phi"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 keywords = ["agent", "versioning", "config", "ai", "cli"]
 authors = [
     {name = "aver contributors"},
@@ -16,7 +16,6 @@ authors = [
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
