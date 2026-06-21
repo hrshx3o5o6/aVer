@@ -1,22 +1,26 @@
-# aVer — Agent Versioning
+<p align="center">
+  <!-- Replace with your logo: <img src="assets/logo.png" width="200" alt="aVer logo"> -->
+  <img src="https://raw.githubusercontent.com/hrshx3o5o6/aVer/main/assets/logo.svg" width="200" alt="aVer">
+</p>
 
-**Version-control your AI agent configs.** aVer snapshots, rolls back, and promotes agent configuration across frameworks — Hermes, Claude Code, OpenCode, Zen, and Phi — using a git-like workflow.
+<h1 align="center">aVer</h1>
 
-```bash
-# One-line install (macOS, Linux, WSL)
-curl -fsSL https://github.com/hrshx3o5o6/aVer/raw/main/install.sh | bash
+<p align="center">
+  <em>Agent Versioning — snapshot, roll back, and promote configs across AI frameworks.</em>
+</p>
 
-cd my-project
+<p align="center">
+  <img src="https://img.shields.io/pypi/v/aver-cli?style=flat-square&color=111111&label=version" alt="PyPI">
+  <img src="https://img.shields.io/github/stars/hrshx3o5o6/aVer?style=flat-square&color=111111&label=stars" alt="Stars">
+  <img src="https://img.shields.io/badge/license-MIT-111111?style=flat-square" alt="License">
+  <img src="https://img.shields.io/badge/python-3.10%2B-111111?style=flat-square" alt="Python 3.10+">
+</p>
 
-# Init the store
-aver init
+<p align="center">
+  <strong>Hermes · Claude Code · OpenCode · Zen · Phi</strong>
+</p>
 
-# Snapshot configs for all detected agents
-aver commit -m "Working setup"
-
-# Or install from PyPI
-pipx install aver-cli
-```
+---
 
 ## Quick start
 
